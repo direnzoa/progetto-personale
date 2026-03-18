@@ -7,6 +7,7 @@ Uso: python3 fetch_articles.py
 import requests
 import json
 import sys
+import time
 from requests.auth import HTTPBasicAuth
 
 # ── CONFIGURA QUI ──────────────────────────────────────────────
@@ -18,17 +19,31 @@ APP_PASS = ""          # es. "xxxx xxxx xxxx xxxx xxxx xxxx"
 BASE = f"{WP_URL}/wp-json/wp/v2"
 auth = HTTPBasicAuth(USERNAME, APP_PASS)
 
+def fetch_page(endpoint, params, retries=5):
+    """Scarica una singola pagina con retry su timeout."""
+    delay = 5
+    for attempt in range(retries):
+        try:
+            r = requests.get(
+                f"{BASE}/{endpoint}",
+                auth=auth,
+                params=params,
+                timeout=90
+            )
+            return r
+        except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+            if attempt == retries - 1:
+                raise
+            print(f"  Timeout/errore, attendo {delay}s e riprovo (tentativo {attempt+2}/{retries})...", flush=True)
+            time.sleep(delay)
+            delay *= 2
+
 def fetch_all(endpoint, params=None):
     items = []
     page  = 1
     params = params or {}
     while True:
-        r = requests.get(
-            f"{BASE}/{endpoint}",
-            auth=auth,
-            params={**params, "per_page": 100, "page": page},
-            timeout=30
-        )
+        r = fetch_page(endpoint, {**params, "per_page": 100, "page": page})
         if r.status_code == 400:
             break
         r.raise_for_status()
@@ -41,6 +56,7 @@ def fetch_all(endpoint, params=None):
         if page >= total_pages:
             break
         page += 1
+        time.sleep(0.5)   # pausa tra le pagine per non sovraccaricare il server
     return items
 
 def main():
@@ -49,7 +65,7 @@ def main():
         sys.exit(1)
 
     print("Connessione a WordPress...")
-    r = requests.get(f"{BASE}/users/me", auth=auth, timeout=10)
+    r = requests.get(f"{BASE}/users/me", auth=auth, timeout=30)
     if r.status_code != 200:
         print(f"ERRORE autenticazione: {r.status_code} {r.text}")
         sys.exit(1)
