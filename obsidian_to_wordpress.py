@@ -404,6 +404,14 @@ def collect_articles(vault: Path) -> list[dict]:
             if not src.startswith("http"):
                 collect_image(Path(src).name)
 
+        # Immagine di copertina (featured image)
+        featured_image_name = meta.get("featured_image") or meta.get("copertina") or meta.get("cover_image") or ""
+        featured_image_path: Path | None = None
+        if featured_image_name:
+            featured_image_path = find_image(featured_image_name, image_dirs)
+            if featured_image_path is None and featured_image_name in all_images:
+                featured_image_path = all_images[featured_image_name]
+
         articles.append({
             "md_file": md_file,
             "title": title,
@@ -418,6 +426,8 @@ def collect_articles(vault: Path) -> list[dict]:
             "author": author,
             "images": referenced_images,   # {nome_file: path_assoluto}
             "image_dirs": image_dirs,
+            "featured_image_name": featured_image_name,
+            "featured_image_path": featured_image_path,
         })
 
     return articles
@@ -524,6 +534,8 @@ def generate_wxr(
         art_author = article["author"] or author
         images: dict[str, Path] = article["images"]
         image_dirs = article["image_dirs"]
+        featured_image_name: str = article.get("featured_image_name", "")
+        featured_image_path: Path | None = article.get("featured_image_path")
 
         date_fmt = pub_date.strftime("%Y-%m-%d %H:%M:%S")
         date_rfc = pub_date.strftime("%a, %d %b %Y %H:%M:%S +0000")
@@ -533,6 +545,8 @@ def generate_wxr(
         # Mappa nome_file → URL finale (o data URI se embed)
         image_url_map: dict[str, str] = {}
         attachment_items: list[str] = []
+
+        featured_attachment_id: int | None = None
 
         for img_name, img_path in images.items():
             if embed_images:
@@ -572,6 +586,44 @@ def generate_wxr(
     <wp:attachment_url>{img_url}</wp:attachment_url>
   </item>''')
 
+        # ── Featured image (immagine di copertina) ────────────────────────
+        if featured_image_name and not embed_images:
+            fi_path = featured_image_path
+            # Se non trovata prima, prova nei dirs
+            if fi_path is None:
+                fi_path = find_image(featured_image_name, image_dirs)
+
+            if fi_path is not None or featured_image_name:
+                base = (images_base_url or f"{site_url.rstrip('/')}/wp-content/uploads/{pub_date.year}/{pub_date.month:02d}").rstrip("/")
+                fi_url = f"{base}/{featured_image_name}"
+                attachment_id += 1
+                featured_attachment_id = attachment_id
+                # Aggiungi anche alla mappa URL (utile se viene usata nel body)
+                image_url_map[featured_image_name] = fi_url
+                attachment_items.append(f'''  <item>
+    <title>{xml_escape(featured_image_name)}</title>
+    <link>{fi_url}</link>
+    <pubDate>{date_rfc}</pubDate>
+    <dc:creator><![CDATA[{art_author}]]></dc:creator>
+    <guid isPermaLink="false">{fi_url}</guid>
+    <description></description>
+    <content:encoded><![CDATA[]]></content:encoded>
+    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    <wp:post_id>{featured_attachment_id}</wp:post_id>
+    <wp:post_date>{date_fmt}</wp:post_date>
+    <wp:post_date_gmt>{date_fmt}</wp:post_date_gmt>
+    <wp:comment_status>closed</wp:comment_status>
+    <wp:ping_status>closed</wp:ping_status>
+    <wp:post_name>{xml_escape(slugify(featured_image_name))}</wp:post_name>
+    <wp:status>inherit</wp:status>
+    <wp:post_parent>{post_id}</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type>attachment</wp:post_type>
+    <wp:post_password></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+    <wp:attachment_url>{fi_url}</wp:attachment_url>
+  </item>''')
+
         # ── Converti Markdown → HTML ───────────────────────────────────────
         def resolve_image(name: str) -> str:
             img_path = find_image(name, image_dirs)
@@ -594,6 +646,15 @@ def generate_wxr(
         for tag in tags:
             cat_xml += f'    <category domain="post_tag" nicename="{xml_escape(slugify(tag))}"><![CDATA[{tag}]]></category>\n'
 
+        # _thumbnail_id postmeta per la featured image
+        thumbnail_meta_xml = ""
+        if featured_attachment_id is not None:
+            thumbnail_meta_xml = f'''    <wp:postmeta>
+      <wp:meta_key>_thumbnail_id</wp:meta_key>
+      <wp:meta_value><![CDATA[{featured_attachment_id}]]></wp:meta_value>
+    </wp:postmeta>
+'''
+
         xml_parts.append(f'''  <item>
     <title>{xml_escape(title)}</title>
     <link>{guid}</link>
@@ -615,7 +676,7 @@ def generate_wxr(
     <wp:post_type>post</wp:post_type>
     <wp:post_password></wp:post_password>
     <wp:is_sticky>0</wp:is_sticky>
-{cat_xml}  </item>''')
+{cat_xml}{thumbnail_meta_xml}  </item>''')
 
         xml_parts.extend(attachment_items)
 
@@ -653,6 +714,7 @@ Frontmatter YAML supportato nelle note Obsidian:
   status: publish        # publish | draft | private
   author: mario
   excerpt: Breve descrizione
+  featured_image: copertina.jpg   # immagine di copertina (nella stessa cartella del .md)
   ---
 """
     )
