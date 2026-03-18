@@ -25,7 +25,8 @@ import mimetypes
 import argparse
 import unicodedata
 from pathlib import Path
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta
 
 
 # ─── Utility ──────────────────────────────────────────────────────────────────
@@ -48,6 +49,14 @@ def xml_escape(text: str) -> str:
             .replace('"', "&quot;")
             .replace("'", "&apos;")
     )
+
+
+def random_time(dt: datetime) -> datetime:
+    """Sostituisce l'orario di un datetime con uno casuale tra le 9:00 e le 13:30."""
+    start_minutes = 9 * 60        # 540 minuti
+    end_minutes   = 13 * 60 + 30  # 810 minuti
+    minutes = random.randint(start_minutes, end_minutes)
+    return dt.replace(hour=minutes // 60, minute=minutes % 60, second=random.randint(0, 59))
 
 
 def image_to_base64(path: Path) -> tuple[str, str]:
@@ -382,6 +391,7 @@ def collect_articles(vault: Path) -> list[dict]:
             pub_date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.fromtimestamp(md_file.stat().st_mtime)
         except ValueError:
             pub_date = datetime.fromtimestamp(md_file.stat().st_mtime)
+        pub_date = random_time(pub_date)
 
         # Immagini referenziate nel testo
         image_dirs = make_image_dirs(md_file)
