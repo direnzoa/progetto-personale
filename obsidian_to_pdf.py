@@ -179,14 +179,18 @@ def generate_pdfs(articles: list[dict], output_dir: Path) -> tuple[int, int]:
     ok = 0
     errors = 0
 
+    articles_sorted = sorted(articles, key=lambda a: a["pub_date"])
+    width = max(2, len(str(len(articles_sorted))))
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page()
 
-        for article in articles:
+        for idx, article in enumerate(articles_sorted, start=1):
             short = article["title"][:55]
             print(f"  • {short:<55}", end=" ", flush=True)
-            out_path = output_dir / f"{article['slug']}.pdf"
+            prefix = str(idx).zfill(width)
+            out_path = output_dir / f"{prefix}_{article['slug']}.pdf"
             try:
                 html_doc = build_html(article)
                 page.set_content(html_doc, wait_until="load")
