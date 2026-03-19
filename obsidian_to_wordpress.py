@@ -87,23 +87,42 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     yaml_block = content[3:end].strip()
     body = content[end + 4:].lstrip("\n")
 
+    current_key: str | None = None
     for line in yaml_block.splitlines():
-        if ":" not in line:
+        stripped = line.strip()
+
+        # Voce di lista YAML in stile blocco:  "  - valore"
+        if stripped.startswith("- ") and current_key is not None:
+            item = stripped[2:].strip().strip('"').strip("'")
+            if isinstance(meta.get(current_key), list):
+                meta[current_key].append(item)
+            else:
+                meta[current_key] = [item]
             continue
-        key, _, value = line.partition(":")
+
+        if ":" not in stripped:
+            current_key = None
+            continue
+
+        key, _, value = stripped.partition(":")
         key = key.strip()
         value = value.strip()
+        current_key = key
 
         # Liste inline: [a, b, c]
         if value.startswith("[") and value.endswith("]"):
-            items = [v.strip().strip('"').strip("'") for v in value[1:-1].split(",") if v.strip()]
-            meta[key] = items
-        # Stringhe quotate
+            meta[key] = [v.strip().strip('"').strip("'") for v in value[1:-1].split(",") if v.strip()]
+            current_key = None  # lista completa, nessuna continuazione
+        # Stringa quotata
         elif (value.startswith('"') and value.endswith('"')) or \
              (value.startswith("'") and value.endswith("'")):
             meta[key] = value[1:-1]
+            current_key = None
+        elif value == "":
+            meta[key] = []   # prepara per lista in stile blocco
         else:
             meta[key] = value
+            current_key = None
 
     return meta, body
 
