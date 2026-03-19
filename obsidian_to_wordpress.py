@@ -340,7 +340,7 @@ def md_to_html(md: str, image_resolver=None) -> str:
 # ─── Scanner del vault ────────────────────────────────────────────────────────
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico"}
-IMAGE_FOLDER_NAMES = {"assets", "attachments", "images", "img", "media", "files", "static"}
+IMAGE_FOLDER_NAMES = {"assets", "attachments", "images", "img", "media", "files", "static", "immagini"}
 
 
 def find_image(name: str, search_dirs: list[Path]) -> Path | None:
@@ -432,6 +432,16 @@ def collect_articles(vault: Path) -> list[dict]:
             src = m.group(1)
             if not src.startswith("http"):
                 collect_image(Path(src).name)
+
+        # Includi tutte le immagini presenti fisicamente nelle cartelle dell'articolo
+        # (stessa cartella del .md e sottocartelle come "immagini", "assets", ecc.)
+        for d in image_dirs:
+            if not d.is_dir():
+                continue
+            for img in d.iterdir():
+                if img.is_file() and img.suffix.lower() in IMAGE_EXTENSIONS:
+                    if img.name not in referenced_images:
+                        referenced_images[img.name] = img
 
         # Immagine di copertina (featured image)
         featured_image_name = meta.get("featured_image") or meta.get("copertina") or meta.get("cover_image") or ""
