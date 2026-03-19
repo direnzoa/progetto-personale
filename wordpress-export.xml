@@ -12,7 +12,7 @@
   <title>Il mio blog</title>
   <link>https://winechannel.it</link>
   <description></description>
-  <pubDate>Thu, 19 Mar 2026 09:34:59 +0000</pubDate>
+  <pubDate>Thu, 19 Mar 2026 09:42:13 +0000</pubDate>
   <language>it-IT</language>
   <wp:wxr_version>1.2</wp:wxr_version>
   <wp:base_site_url>https://winechannel.it</wp:base_site_url>
@@ -27,52 +27,52 @@
   </wp:author>
 
   <wp:category>
-    <wp:term_id>223</wp:term_id>
+    <wp:term_id>9330</wp:term_id>
     <wp:category_nicename>guide</wp:category_nicename>
     <wp:category_parent></wp:category_parent>
     <wp:cat_name><![CDATA[Guide]]></wp:cat_name>
   </wp:category>
   <wp:category>
-    <wp:term_id>2761</wp:term_id>
+    <wp:term_id>1573</wp:term_id>
     <wp:category_nicename>risorse</wp:category_nicename>
     <wp:category_parent></wp:category_parent>
     <wp:cat_name><![CDATA[Risorse]]></wp:cat_name>
   </wp:category>
   <wp:category>
-    <wp:term_id>2756</wp:term_id>
+    <wp:term_id>8462</wp:term_id>
     <wp:category_nicename>wordpress</wp:category_nicename>
     <wp:category_parent></wp:category_parent>
     <wp:cat_name><![CDATA[WordPress]]></wp:cat_name>
   </wp:category>
   <wp:tag>
-    <wp:term_id>7018</wp:term_id>
+    <wp:term_id>4401</wp:term_id>
     <wp:tag_slug>seo</wp:tag_slug>
     <wp:tag_name><![CDATA[SEO]]></wp:tag_name>
   </wp:tag>
   <wp:tag>
-    <wp:term_id>2177</wp:term_id>
+    <wp:term_id>370</wp:term_id>
     <wp:tag_slug>hosting</wp:tag_slug>
     <wp:tag_name><![CDATA[hosting]]></wp:tag_name>
   </wp:tag>
   <wp:tag>
-    <wp:term_id>2676</wp:term_id>
+    <wp:term_id>8062</wp:term_id>
     <wp:tag_slug>plugin</wp:tag_slug>
     <wp:tag_name><![CDATA[plugin]]></wp:tag_name>
   </wp:tag>
   <wp:tag>
-    <wp:term_id>4879</wp:term_id>
+    <wp:term_id>9620</wp:term_id>
     <wp:tag_slug>tutorial</wp:tag_slug>
     <wp:tag_name><![CDATA[tutorial]]></wp:tag_name>
   </wp:tag>
   <wp:tag>
-    <wp:term_id>6221</wp:term_id>
+    <wp:term_id>1416</wp:term_id>
     <wp:tag_slug>wordpress</wp:tag_slug>
     <wp:tag_name><![CDATA[wordpress]]></wp:tag_name>
   </wp:tag>
   <item>
     <title>nota-senza-frontmatter</title>
     <link>https://winechannel.it/nota-senza-frontmatter/</link>
-    <pubDate>Tue, 17 Mar 2026 09:27:02 +0000</pubDate>
+    <pubDate>Tue, 17 Mar 2026 12:43:22 +0000</pubDate>
     <dc:creator><![CDATA[f.properzicurti]]></dc:creator>
     <guid isPermaLink="false">https://winechannel.it/nota-senza-frontmatter/</guid>
     <description></description>
@@ -94,8 +94,8 @@
 <p>Questo crea una griglia a <strong>3 colonne</strong> di larghezza uguale.</p>]]></content:encoded>
     <excerpt:encoded><![CDATA[]]></excerpt:encoded>
     <wp:post_id>2</wp:post_id>
-    <wp:post_date>2026-03-17 09:27:02</wp:post_date>
-    <wp:post_date_gmt>2026-03-17 09:27:02</wp:post_date_gmt>
+    <wp:post_date>2026-03-17 12:43:22</wp:post_date>
+    <wp:post_date_gmt>2026-03-17 12:43:22</wp:post_date_gmt>
     <wp:comment_status>open</wp:comment_status>
     <wp:ping_status>open</wp:ping_status>
     <wp:post_name>nota-senza-frontmatter</wp:post_name>
@@ -109,7 +109,7 @@
   <item>
     <title>Come installare WordPress in 5 minuti</title>
     <link>https://winechannel.it/come-installare-wordpress-in-5-minuti/</link>
-    <pubDate>Sun, 10 Mar 2024 12:35:54 +0000</pubDate>
+    <pubDate>Sun, 10 Mar 2024 12:29:25 +0000</pubDate>
     <dc:creator><![CDATA[f.properzicurti]]></dc:creator>
     <guid isPermaLink="false">https://winechannel.it/come-installare-wordpress-in-5-minuti/</guid>
     <description></description>
@@ -138,8 +138,8 @@ GRANT ALL PRIVILEGES ON mio_blog.* TO &apos;utente&apos;@&apos;localhost&apos;;<
 </blockquote>]]></content:encoded>
     <excerpt:encoded><![CDATA[Guida rapida per installare WordPress sul tuo server in pochi passi.]]></excerpt:encoded>
     <wp:post_id>3</wp:post_id>
-    <wp:post_date>2024-03-10 12:35:54</wp:post_date>
-    <wp:post_date_gmt>2024-03-10 12:35:54</wp:post_date_gmt>
+    <wp:post_date>2024-03-10 12:29:25</wp:post_date>
+    <wp:post_date_gmt>2024-03-10 12:29:25</wp:post_date_gmt>
     <wp:comment_status>open</wp:comment_status>
     <wp:ping_status>open</wp:ping_status>
     <wp:post_name>come-installare-wordpress-in-5-minuti</wp:post_name>
@@ -158,7 +158,7 @@ GRANT ALL PRIVILEGES ON mio_blog.* TO &apos;utente&apos;@&apos;localhost&apos;;<
   <item>
     <title>I migliori plugin WordPress del 2024</title>
     <link>https://winechannel.it/i-migliori-plugin-wordpress-del-2024/</link>
-    <pubDate>Mon, 20 May 2024 09:36:22 +0000</pubDate>
+    <pubDate>Mon, 20 May 2024 09:57:39 +0000</pubDate>
     <dc:creator><![CDATA[f.properzicurti]]></dc:creator>
     <guid isPermaLink="false">https://winechannel.it/i-migliori-plugin-wordpress-del-2024/</guid>
     <description></description>
@@ -207,8 +207,8 @@ GRANT ALL PRIVILEGES ON mio_blog.* TO &apos;utente&apos;@&apos;localhost&apos;;<
 <p>Vedi anche: <a href="come-installare-wordpress-in-5-minuti">Come installare WordPress in 5 minuti</a></p>]]></content:encoded>
     <excerpt:encoded><![CDATA[Una selezione dei plugin più utili per il tuo sito WordPress.]]></excerpt:encoded>
     <wp:post_id>4</wp:post_id>
-    <wp:post_date>2024-05-20 09:36:22</wp:post_date>
-    <wp:post_date_gmt>2024-05-20 09:36:22</wp:post_date_gmt>
+    <wp:post_date>2024-05-20 09:57:39</wp:post_date>
+    <wp:post_date_gmt>2024-05-20 09:57:39</wp:post_date_gmt>
     <wp:comment_status>open</wp:comment_status>
     <wp:ping_status>open</wp:ping_status>
     <wp:post_name>i-migliori-plugin-wordpress-del-2024</wp:post_name>

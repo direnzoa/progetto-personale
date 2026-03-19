@@ -642,9 +642,11 @@ def generate_wxr(
   </item>''')
 
         # ── Featured image (immagine di copertina) ────────────────────────
-        # L'attachment per la featured image viene creato sempre (anche con --embed-images)
-        # perché _thumbnail_id richiede un post attachment con URL WordPress.
-        if featured_image_name:
+        # Con --embed-images le immagini sono già base64 nell'HTML, ma WordPress
+        # per _thumbnail_id richiede un attachment con URL scaricabile dal server.
+        # Creiamo l'attachment solo in modalità non-embed, dove WordPress può
+        # scaricare l'immagine durante l'importazione.
+        if featured_image_name and not embed_images:
             fi_path = featured_image_path
             # Se non trovata prima, prova nei dirs
             if fi_path is None:
@@ -819,7 +821,12 @@ Frontmatter YAML supportato nelle note Obsidian:
         print(f"  • {a['title']}{img_str}")
 
     print(f"\nImmagini totali referenziate: {total_images}")
-    if not args.embed_images and total_images > 0:
+    if args.embed_images and total_images > 0:
+        print("  ℹ  Modalità --embed-images: immagini incorporate come base64 nel contenuto.")
+        print("     NOTA: l'immagine in evidenza (featured image) NON viene impostata automaticamente")
+        print("     in questa modalità perché richiede un file accessibile sul server WordPress.")
+        print("     Dopo l'importazione, imposta manualmente l'immagine in evidenza per ogni articolo.")
+    elif not args.embed_images and total_images > 0:
         print("  ℹ  Le immagini NON sono incorporate nel XML.")
         print("     Durante l'importazione WordPress spunterà 'Scarica e importa allegati'.")
         print("     Assicurati che le immagini siano accessibili via URL, oppure usa --embed-images.")
