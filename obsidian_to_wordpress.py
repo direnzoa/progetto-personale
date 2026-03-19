@@ -848,6 +848,29 @@ Frontmatter YAML supportato nelle note Obsidian:
     output.write_text(wxr, encoding="utf-8")
     size_kb = output.stat().st_size / 1024
     print(f"\n✓ File creato: {output} ({size_kb:.1f} KB)")
+
+    # ── Report immagini in evidenza ────────────────────────────────────────────
+    featured_articles = [a for a in articles if a.get("featured_image_name")]
+    if featured_articles:
+        report_path = output.with_name(output.stem + "-copertine.txt")
+        lines = ["Immagini in evidenza da caricare su WordPress Media Library", "=" * 60, ""]
+        for a in featured_articles:
+            img_name = a["featured_image_name"]
+            img_path = a.get("featured_image_path")
+            found = f"  ✓ trovata: {img_path}" if img_path else "  ✗ file non trovato nel vault"
+            lines.append(f"Articolo : {a['title']}")
+            lines.append(f"Immagine : {img_name}")
+            lines.append(found)
+            lines.append("")
+        report_path.write_text("\n".join(lines), encoding="utf-8")
+
+        print(f"\n📋 Report copertine: {report_path.name}")
+        print(f"   {len(featured_articles)} articoli con immagine in evidenza:")
+        for a in featured_articles:
+            img_name = a["featured_image_name"]
+            found_mark = "✓" if a.get("featured_image_path") else "✗"
+            print(f"   {found_mark} {a['title'][:45]:<45}  →  {img_name}")
+
     print("\nProssimi passi:")
     print("  1. Apri il pannello WordPress → Strumenti → Importa")
     print("  2. Clicca 'Installa' sotto 'WordPress'")
@@ -855,6 +878,9 @@ Frontmatter YAML supportato nelle note Obsidian:
     print(f"  4. Carica il file: {output.name}")
     if not args.embed_images and total_images > 0:
         print("  5. Spunta 'Scarica e importa allegati' per importare le immagini")
+    if featured_articles and args.embed_images:
+        print("  5. Per ogni articolo nel report copertine: apri il post →")
+        print("     Immagine in evidenza → Sostituisci → carica il file dalla tua macchina")
 
 
 if __name__ == "__main__":
