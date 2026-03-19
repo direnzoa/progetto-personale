@@ -7,6 +7,7 @@ Utilizzo:
     python3 obsidian_to_wordpress.py --vault /percorso/vault --output export.xml --url https://tuosito.com
     python3 obsidian_to_wordpress.py --vault /percorso/vault --output export.xml --url https://tuosito.com --embed-images
     python3 obsidian_to_wordpress.py --vault /percorso/vault --output export.xml --url https://tuosito.com --status draft
+    python3 obsidian_to_wordpress.py --vault /percorso/vault --output export.xml --url https://tuosito.com --auto-tags
 
 Strutture vault supportate:
     1. Una cartella per articolo (ogni cartella = un post, le immagini sono dentro la cartella)
@@ -19,11 +20,14 @@ Requisiti: Python 3.6+ (nessuna dipendenza esterna)
 import os
 import re
 import sys
+import json
 import base64
 import hashlib
 import mimetypes
 import argparse
 import unicodedata
+import urllib.request
+import urllib.error
 from pathlib import Path
 import random
 from datetime import datetime, timezone, timedelta
@@ -335,6 +339,55 @@ def md_to_html(md: str, image_resolver=None) -> str:
         html_lines.append(f"<pre><code>{xml_escape(chr(10).join(code_lines))}</code></pre>")
 
     return "\n".join(html_lines)
+
+
+# ─── Generazione tag con Claude API ───────────────────────────────────────────
+
+def generate_tags_with_claude(title: str, body: str, api_key: str, n: int = 6) -> list[str]:
+    """
+    Chiama Claude Haiku per generare tag SEO pertinenti all'articolo.
+    Restituisce una lista di tag (stringhe), vuota in caso di errore.
+    """
+    excerpt = body[:3000] if len(body) > 3000 else body
+    prompt = (
+        f"Sei un esperto SEO per blog italiani. "
+        f"Leggi l'articolo e suggerisci esattamente {n} tag pertinenti, "
+        f"separati da virgola, in minuscolo, senza spiegazioni aggiuntive. "
+        f"I tag devono essere parole chiave specifiche e utili per la SEO.\n\n"
+        f"Titolo: {title}\n\n"
+        f"Testo:\n{excerpt}"
+    )
+
+    payload = json.dumps({
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 120,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            text = data["content"][0]["text"].strip()
+            tags = [t.strip().strip('"').strip("'") for t in text.split(",") if t.strip()]
+            return tags[:n]
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        print(f"  ⚠  Errore API Claude ({e.code}): {err_body[:200]}", file=sys.stderr)
+        return []
+    except Exception as exc:
+        print(f"  ⚠  Errore generazione tag: {exc}", file=sys.stderr)
+        return []
 
 
 # ─── Scanner del vault ────────────────────────────────────────────────────────
@@ -766,6 +819,13 @@ Esempi:
   python3 obsidian_to_wordpress.py --vault ~/Obsidian/Blog --output mio-export.xml \\
     --url https://miosito.it --title "Il mio blog" --author mario --author-email mario@example.com
 
+  # Tag automatici con Claude API (per articoli senza tag nel frontmatter)
+  ANTHROPIC_API_KEY=sk-ant-... python3 obsidian_to_wordpress.py --vault ~/Obsidian/Blog \\
+    --url https://miosito.it --auto-tags
+  # oppure con --api-key esplicito:
+  python3 obsidian_to_wordpress.py --vault ~/Obsidian/Blog --url https://miosito.it \\
+    --auto-tags --api-key sk-ant-...
+
 Frontmatter YAML supportato nelle note Obsidian:
   ---
   title: Titolo dell'articolo
@@ -796,6 +856,10 @@ Frontmatter YAML supportato nelle note Obsidian:
                         help="Incorpora le immagini come base64 nel file XML (standalone, nessun upload separato)")
     parser.add_argument("--images-base-url", default=None,
                         help="URL base per le immagini (default: <url>/wp-content/uploads/YYYY/MM)")
+    parser.add_argument("--auto-tags", action="store_true",
+                        help="Genera tag automaticamente con Claude API per gli articoli privi di tag")
+    parser.add_argument("--api-key", default=None,
+                        help="API key Anthropic per --auto-tags (altrimenti usa la variabile d'ambiente ANTHROPIC_API_KEY)")
 
     args = parser.parse_args()
 
@@ -810,6 +874,28 @@ Frontmatter YAML supportato nelle note Obsidian:
     if not articles:
         print("Nessuna nota .md trovata nel vault.", file=sys.stderr)
         sys.exit(1)
+
+    # ── Generazione tag automatica con Claude API ──────────────────────────────
+    if args.auto_tags:
+        api_key = args.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            print("ERRORE: --auto-tags richiede una API key Anthropic.", file=sys.stderr)
+            print("       Passa --api-key sk-ant-... oppure imposta la variabile d'ambiente ANTHROPIC_API_KEY.", file=sys.stderr)
+            sys.exit(1)
+        articles_without_tags = [a for a in articles if not a["tags"]]
+        if articles_without_tags:
+            print(f"Generazione tag automatica per {len(articles_without_tags)} articoli (Claude Haiku)...")
+            for a in articles_without_tags:
+                short_title = a["title"][:50]
+                print(f"  • {short_title:<50}", end=" ", flush=True)
+                tags = generate_tags_with_claude(a["title"], a["body"], api_key)
+                if tags:
+                    a["tags"] = tags
+                    print(f"→ {', '.join(tags)}")
+                else:
+                    print("→ nessun tag generato")
+        else:
+            print("Tutti gli articoli hanno già i tag nel frontmatter, --auto-tags ignorato.")
 
     print(f"Trovati {len(articles)} articoli:")
     total_images = 0
