@@ -2,18 +2,15 @@
 """
 obsidian_to_pdf.py
 Esporta ogni nota Obsidian come file PDF individuale.
+Usa Playwright (Chromium headless) — nessuna dipendenza di sistema.
 
 Utilizzo:
     python3 obsidian_to_pdf.py --vault /percorso/vault --output ./pdf-export
     python3 obsidian_to_pdf.py --vault "X:\\articoli" --output "C:\\Desktop\\pdf"
 
 Requisiti:
-    pip install weasyprint
-
-Note Windows:
-    Se weasyprint dà errori di dipendenze su Windows, installa prima GTK3:
-    https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases
-    In alternativa: pip install xhtml2pdf  (qualità inferiore, nessuna dep di sistema)
+    pip install playwright
+    playwright install chromium
 """
 
 import sys
@@ -35,40 +32,17 @@ except ImportError:
     print("ERRORE: obsidian_to_wordpress.py non trovato nella stessa cartella.", file=sys.stderr)
     sys.exit(1)
 
-# ─── Backend PDF ───────────────────────────────────────────────────────────────
-
-def _try_import_backend():
-    """Prova weasyprint, poi xhtml2pdf. Ritorna ('weasyprint'|'xhtml2pdf', modulo)."""
-    try:
-        import weasyprint  # noqa: F401
-        return "weasyprint", weasyprint
-    except ImportError:
-        pass
-    try:
-        import xhtml2pdf.pisa as pisa  # noqa: F401
-        return "xhtml2pdf", pisa
-    except ImportError:
-        pass
-    return None, None
-
-
 # ─── CSS per il PDF ────────────────────────────────────────────────────────────
 
 PDF_CSS = """
-@page {
-    size: A4;
-    margin: 2.5cm 2cm 2.5cm 2cm;
-    @bottom-center {
-        content: counter(page) " / " counter(pages);
-        font-size: 9pt;
-        color: #888;
-    }
-}
+* { box-sizing: border-box; }
+@page { size: A4; margin: 2.5cm 2cm 2.5cm 2cm; }
 body {
     font-family: Georgia, 'Times New Roman', serif;
     font-size: 11pt;
     line-height: 1.65;
     color: #1a1a1a;
+    max-width: 100%;
 }
 h1 {
     font-size: 22pt;
@@ -106,7 +80,7 @@ pre {
 pre code { background: none; padding: 0; }
 blockquote {
     border-left: 3px solid #ccc;
-    margin: 0.8em 0 0.8em 0;
+    margin: 0.8em 0;
     padding: 0.2em 0 0.2em 1em;
     color: #555;
     font-style: italic;
@@ -117,11 +91,7 @@ table {
     margin: 1em 0;
     font-size: 10pt;
 }
-th, td {
-    border: 1px solid #ccc;
-    padding: 0.35em 0.65em;
-    text-align: left;
-}
+th, td { border: 1px solid #ccc; padding: 0.35em 0.65em; text-align: left; }
 th { background: #f0f0f0; font-weight: bold; }
 tr:nth-child(even) { background: #fafafa; }
 a { color: #1a4f8a; text-decoration: none; }
@@ -148,13 +118,12 @@ HTML_TEMPLATE = """\
 </html>
 """
 
+# ─── Costruzione HTML ──────────────────────────────────────────────────────────
 
-# ─── Funzione di conversione ───────────────────────────────────────────────────
-
-def _build_html(article: dict, css: str) -> str:
+def build_html(article: dict) -> str:
     """Assembla il documento HTML per un articolo, con immagini inline (base64)."""
-    title = article["title"]
-    body  = article["body"]
+    title      = article["title"]
+    body       = article["body"]
     pub_date   = article["pub_date"]
     tags       = article["tags"]
     categories = article["categories"]
@@ -191,34 +160,71 @@ def _build_html(article: dict, css: str) -> str:
         title_escaped=xml_escape(title),
         meta_line=meta_line,
         content=html_content,
-        css=css,
+        css=PDF_CSS,
     )
 
 
-def article_to_pdf_weasyprint(article: dict, output_dir: Path, wp_module) -> Path:
-    html_doc = _build_html(article, PDF_CSS)
-    out_path = output_dir / f"{article['slug']}.pdf"
-    wp_module.HTML(string=html_doc, base_url=str(output_dir)).write_pdf(
-        target=str(out_path),
-    )
-    return out_path
+# ─── Generazione PDF con Playwright ───────────────────────────────────────────
 
+def generate_pdfs(articles: list[dict], output_dir: Path) -> tuple[int, int]:
+    try:
+        from playwright.sync_api import sync_playwright, Error as PWError
+    except ImportError:
+        print("ERRORE: playwright non è installato.", file=sys.stderr)
+        print("       Installa con:", file=sys.stderr)
+        print("           pip install playwright", file=sys.stderr)
+        print("           playwright install chromium", file=sys.stderr)
+        sys.exit(1)
 
-def article_to_pdf_xhtml2pdf(article: dict, output_dir: Path, pisa_module) -> Path:
-    html_doc = _build_html(article, PDF_CSS)
-    out_path = output_dir / f"{article['slug']}.pdf"
-    with open(out_path, "wb") as f:
-        result = pisa_module.CreatePDF(html_doc, dest=f)
-    if result.err:
-        raise RuntimeError(f"xhtml2pdf ha riportato {result.err} errori")
-    return out_path
+    ok = 0
+    errors = 0
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        for article in articles:
+            short = article["title"][:55]
+            print(f"  • {short:<55}", end=" ", flush=True)
+            out_path = output_dir / f"{article['slug']}.pdf"
+            try:
+                html_doc = build_html(article)
+                page.set_content(html_doc, wait_until="load")
+                page.pdf(
+                    path=str(out_path),
+                    format="A4",
+                    print_background=True,
+                    margin={"top": "2cm", "bottom": "2cm",
+                            "left": "1.8cm", "right": "1.8cm"},
+                    display_header_footer=True,
+                    header_template='<div style="font-size:0;"></div>',
+                    footer_template=(
+                        '<div style="font-size:8px;width:100%;text-align:center;'
+                        'color:#999;padding:4px 0;">'
+                        '<span class="pageNumber"></span> / <span class="totalPages"></span>'
+                        '</div>'
+                    ),
+                )
+                size_kb = out_path.stat().st_size / 1024
+                print(f"✓  {out_path.name}  ({size_kb:.0f} KB)")
+                ok += 1
+            except PWError as exc:
+                print(f"✗  ERRORE Playwright: {exc}")
+                errors += 1
+            except Exception as exc:
+                print(f"✗  ERRORE: {exc}")
+                errors += 1
+
+        browser.close()
+
+    return ok, errors
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Esporta ogni nota Obsidian come file PDF individuale",
+        description="Esporta ogni nota Obsidian come file PDF individuale (Playwright)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
@@ -229,12 +235,8 @@ Esempi:
     --output "C:\\Users\\Admini\\Desktop\\pdf-export"
 
 Requisiti:
-  pip install weasyprint
-  (oppure: pip install xhtml2pdf  se weasyprint dà problemi su Windows)
-
-Note Windows (weasyprint):
-  Se ottieni errori GTK, scarica l'installer da:
-  https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases
+  pip install playwright
+  playwright install chromium
 """,
     )
     parser.add_argument("--vault",  "-v", required=True,
@@ -244,16 +246,6 @@ Note Windows (weasyprint):
 
     args = parser.parse_args()
 
-    # ── Controlla backend ──────────────────────────────────────────────────────
-    backend_name, backend_mod = _try_import_backend()
-    if backend_name is None:
-        print("ERRORE: nessun backend PDF trovato.", file=sys.stderr)
-        print("       Installa con:  pip install weasyprint", file=sys.stderr)
-        print("       Alternativa:   pip install xhtml2pdf", file=sys.stderr)
-        sys.exit(1)
-    print(f"Backend PDF: {backend_name}")
-
-    # ── Vault ──────────────────────────────────────────────────────────────────
     vault = Path(args.vault).expanduser().resolve()
     if not vault.is_dir():
         print(f"ERRORE: La cartella '{vault}' non esiste.", file=sys.stderr)
@@ -262,7 +254,6 @@ Note Windows (weasyprint):
     output_dir = Path(args.output).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Scansione ─────────────────────────────────────────────────────────────
     print(f"Scansione vault: {vault}")
     articles = collect_articles(vault)
 
@@ -272,25 +263,8 @@ Note Windows (weasyprint):
 
     print(f"Trovati {len(articles)} articoli → output in: {output_dir}\n")
 
-    # ── Conversione ───────────────────────────────────────────────────────────
-    ok = 0
-    errors = 0
-    for article in articles:
-        short = article["title"][:55]
-        print(f"  • {short:<55}", end=" ", flush=True)
-        try:
-            if backend_name == "weasyprint":
-                pdf_path = article_to_pdf_weasyprint(article, output_dir, backend_mod)
-            else:
-                pdf_path = article_to_pdf_xhtml2pdf(article, output_dir, backend_mod)
-            size_kb = pdf_path.stat().st_size / 1024
-            print(f"✓  {pdf_path.name}  ({size_kb:.0f} KB)")
-            ok += 1
-        except Exception as exc:
-            print(f"✗  ERRORE: {exc}")
-            errors += 1
+    ok, errors = generate_pdfs(articles, output_dir)
 
-    # ── Riepilogo ─────────────────────────────────────────────────────────────
     print(f"\n{'─' * 60}")
     print(f"Completato: {ok} PDF generati", end="")
     if errors:
