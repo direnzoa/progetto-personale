@@ -580,12 +580,17 @@ def generate_wxr(
         status = default_status or article["status"]
         excerpt = article["excerpt"]
         art_author_display = article["author"] or author
-        # dc:creator deve essere il login WP (slug), non il display name
-        art_author = slugify(article["author"]) if article["author"] else effective_login
+        # dc:creator DEVE corrispondere esattamente a wp:author_login
+        art_author = effective_login
         images: dict[str, Path] = article["images"]
         image_dirs = article["image_dirs"]
         featured_image_name: str = article.get("featured_image_name", "")
         featured_image_path: Path | None = article.get("featured_image_path")
+
+        # Auto-featured: se non specificata nel frontmatter, usa la prima immagine disponibile
+        if not featured_image_name and images:
+            featured_image_name = next(iter(images))
+            featured_image_path = images[featured_image_name]
 
         date_fmt = pub_date.strftime("%Y-%m-%d %H:%M:%S")
         date_rfc = pub_date.strftime("%a, %d %b %Y %H:%M:%S +0000")
@@ -637,7 +642,9 @@ def generate_wxr(
   </item>''')
 
         # ── Featured image (immagine di copertina) ────────────────────────
-        if featured_image_name and not embed_images:
+        # L'attachment per la featured image viene creato sempre (anche con --embed-images)
+        # perché _thumbnail_id richiede un post attachment con URL WordPress.
+        if featured_image_name:
             fi_path = featured_image_path
             # Se non trovata prima, prova nei dirs
             if fi_path is None:
