@@ -145,8 +145,8 @@ def md_to_html(md: str, image_resolver=None) -> str:
         def repl_obs_img(m):
             parts = m.group(1).split("|")
             filename = parts[0].strip()
-            alt = parts[1].strip() if len(parts) > 1 else filename
-            src = image_resolver(filename) if image_resolver else filename
+            alt = parts[1].strip() if len(parts) > 1 else Path(filename).name
+            src = image_resolver(filename) if image_resolver else Path(filename).name
             return f'<img src="{src}" alt="{xml_escape(alt)}" />'
         text = re.sub(r"!\[\[([^\]]+)\]\]", repl_obs_img, text)
 
@@ -418,11 +418,14 @@ def collect_articles(vault: Path) -> list[dict]:
 
         def collect_image(name: str) -> str:
             """Segna l'immagine come usata e restituisce il nome."""
+            basename = Path(name).name
             img_path = find_image(name, image_dirs)
-            if img_path is None and name in all_images:
-                img_path = all_images[name]
+            if img_path is None:
+                img_path = find_image(basename, image_dirs)
+            if img_path is None:
+                img_path = all_images.get(name) or all_images.get(basename)
             if img_path:
-                referenced_images[name] = img_path
+                referenced_images[basename] = img_path  # normalizza sempre al basename
             return name  # placeholder; sarà sostituito in fase di export
 
         # Scansione immagini nel body (per la raccolta)
@@ -665,16 +668,19 @@ def generate_wxr(
 
         # ── Converti Markdown → HTML ───────────────────────────────────────
         def resolve_image(name: str) -> str:
+            basename = Path(name).name
             img_path = find_image(name, image_dirs)
             if img_path is None:
-                img_path = images.get(name)
+                img_path = find_image(basename, image_dirs)
+            if img_path is None:
+                img_path = images.get(name) or images.get(basename)
             if img_path and embed_images:
                 try:
                     _, data_uri = image_to_base64(img_path)
                     return data_uri
                 except Exception:
                     pass
-            return image_url_map.get(name, name)
+            return image_url_map.get(name) or image_url_map.get(basename) or basename
 
         html_content = md_to_html(body, image_resolver=resolve_image)
 
