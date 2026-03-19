@@ -16,6 +16,7 @@ Requisiti:
 import sys
 import argparse
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -71,8 +72,18 @@ def parse_articles_from_wxr(xml_path: Path, override_url: str | None = None) -> 
         if override_url and slug:
             url = f"{override_url.rstrip('/')}/{slug}/"
 
+        date_el = item.find(f"{{{WP_NS}}}post_date")
+        pub_date = None
+        if date_el is not None and date_el.text:
+            try:
+                pub_date = datetime.strptime(date_el.text.strip(), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+        if pub_date is None:
+            pub_date = datetime.min
+
         if url:
-            articles.append({"title": title, "slug": slug or title, "url": url})
+            articles.append({"title": title, "slug": slug or title, "url": url, "pub_date": pub_date})
 
     return articles, base_url or ""
 
@@ -101,6 +112,9 @@ def generate_pdfs(
     ok = 0
     errors = 0
 
+    articles_sorted = sorted(articles, key=lambda a: a["pub_date"])
+    width = max(2, len(str(len(articles_sorted))))
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context(
@@ -109,14 +123,15 @@ def generate_pdfs(
         )
         page = context.new_page()
 
-        for article in articles:
+        for idx, article in enumerate(articles_sorted, start=1):
             title = article["title"]
             slug  = article["slug"]
             url   = article["url"]
             short = title[:55]
             print(f"  • {short:<55}", end=" ", flush=True)
 
-            out_path = output_dir / f"{slug}.pdf"
+            prefix = str(idx).zfill(width)
+            out_path = output_dir / f"{prefix}_{slug}.pdf"
             try:
                 page.goto(url, wait_until="networkidle", timeout=30_000)
                 # Attesa extra opzionale per contenuti JS pesanti
