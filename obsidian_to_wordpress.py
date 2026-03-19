@@ -498,9 +498,9 @@ WXR_HEADER = '''<?xml version="1.0" encoding="UTF-8" ?>
   <wp:base_blog_url>{site_url}</wp:base_blog_url>
   <wp:author>
     <wp:author_id>1</wp:author_id>
-    <wp:author_login>{author}</wp:author_login>
+    <wp:author_login>{author_login}</wp:author_login>
     <wp:author_email>{author_email}</wp:author_email>
-    <wp:author_display_name><![CDATA[{author}]]></wp:author_display_name>
+    <wp:author_display_name><![CDATA[{author_display}]]></wp:author_display_name>
     <wp:author_first_name><![CDATA[]]></wp:author_first_name>
     <wp:author_last_name><![CDATA[]]></wp:author_last_name>
   </wp:author>
@@ -517,6 +517,7 @@ def generate_wxr(
     site_title: str = "Il mio blog",
     site_desc: str = "",
     author: str = "admin",
+    author_login: str | None = None,
     author_email: str = "admin@example.com",
     language: str = "it-IT",
     default_status: str | None = None,
@@ -528,13 +529,18 @@ def generate_wxr(
     now = datetime.now()
     pub_date_rfc = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
+    # login WordPress: slug senza spazi (es. "francescoproperzi")
+    # display: nome completo leggibile (es. "Francesco Properzi Curti")
+    effective_login = author_login if author_login else slugify(author)
+
     xml_parts = [WXR_HEADER.format(
         site_title=xml_escape(site_title),
         site_url=site_url.rstrip("/"),
         site_desc=xml_escape(site_desc),
         pub_date=pub_date_rfc,
         language=language,
-        author=xml_escape(author),
+        author_login=xml_escape(effective_login),
+        author_display=xml_escape(author),
         author_email=xml_escape(author_email),
     )]
 
@@ -573,7 +579,9 @@ def generate_wxr(
         categories = article["categories"]
         status = default_status or article["status"]
         excerpt = article["excerpt"]
-        art_author = article["author"] or author
+        art_author_display = article["author"] or author
+        # dc:creator deve essere il login WP (slug), non il display name
+        art_author = slugify(article["author"]) if article["author"] else effective_login
         images: dict[str, Path] = article["images"]
         image_dirs = article["image_dirs"]
         featured_image_name: str = article.get("featured_image_name", "")
@@ -768,7 +776,10 @@ Frontmatter YAML supportato nelle note Obsidian:
     parser.add_argument("--url", "-u", required=True, help="URL del sito WordPress (es. https://miosito.it)")
     parser.add_argument("--title", "-t", default="Il mio blog", help="Titolo del sito")
     parser.add_argument("--description", "-d", default="", help="Descrizione del sito")
-    parser.add_argument("--author", "-a", default="admin", help="Username dell'autore (default: admin)")
+    parser.add_argument("--author", "-a", default="admin", help="Nome display dell'autore (es. 'Francesco Properzi Curti')")
+    parser.add_argument("--author-login", default=None,
+                        help="Login WordPress dell'autore, senza spazi (es. 'francescoproperzi'). "
+                             "Se omesso, viene generato automaticamente dal nome autore.")
     parser.add_argument("--author-email", default="admin@example.com", help="Email dell'autore")
     parser.add_argument("--language", default="it-IT", help="Lingua del blog (default: it-IT)")
     parser.add_argument("--status", choices=["publish", "draft", "private"], default=None,
@@ -813,6 +824,7 @@ Frontmatter YAML supportato nelle note Obsidian:
         site_title=args.title,
         site_desc=args.description,
         author=args.author,
+        author_login=args.author_login,
         author_email=args.author_email,
         language=args.language,
         default_status=args.status,
